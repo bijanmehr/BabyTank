@@ -1,0 +1,95 @@
+clc; clear; close all;
+
+%% draw path
+figure;
+axis([0 10 0 10]) %1m*1m field
+grid;
+hFH = imfreehand();
+path = hFH.getPosition;
+delete(hFH);
+
+hold on;
+xCrd = path(:, 1);
+yCrd = path(:, 2);
+%a filter needed here to delet out of the range points to smooth curves
+plot(xCrd, yCrd, 'ro', 'LineWidth', 1, 'MarkerSize', 5);
+% hold off;
+
+%% Create a 1m x 1m empty map.
+map = robotics.BinaryOccupancyGrid(1,1,100);
+
+
+%% Set the current location and the goal location of the robot as defined by the path
+
+robotCurrentLocation = path(1,:);
+robotGoal = path(end,:);
+
+%% an initial robot orientation and current pose
+
+initialOrientation = 90;
+robotCurrentPose = [robotCurrentLocation initialOrientation];
+
+%% Initialize the robot simulator
+%robot has kinematic equations for the motion of a two-wheeled differential drive robot.
+% The inputs to this simulated robot are linear and angular velocities. It also has plotting
+% capabilities to display the robot's current location and draw the
+% trajectory of the robot.
+
+robotRadius = .1;
+    %loads a predefined map with MAPNAME and sets the resolution to
+    %MAPRESOLUTION (in cells / meter). By default, the resolution is 2 cells / meter.
+robot = ExampleHelperRobotSimulator('emptyMap',2);
+robot.enableLaser(false);
+robot.setRobotSize(robotRadius);
+robot.showTrajectory(true);
+robot.setRobotPose(robotCurrentPose);
+
+%% Visualize the desired path
+plot(path(:,1), path(:,2),'k--d')
+xlim([0 10])
+ylim([0 10])
+
+%% Define the Path Following Controller
+% Use the path defined above to set the desired waypoints for the controller
+
+controller = robotics.PurePursuit;
+controller.Waypoints = path;
+controller.DesiredLinearVelocity = 0.8; %linear velocity
+controller.MaxAngularVelocity = 3;      %max angular velocity
+% As a general rule, the lookahead distance should be larger than the desired
+% linear velocity for a smooth path. The robot might cut corners when the
+% lookahead distance is large. In contrast, a small lookahead distance can
+% result in an unstable path following behavior.
+controller.LookaheadDistance = .4; 
+%desired distance threshold between the robot's final location and the goal location
+goalRadius = 0.1; 
+distanceToGoal = norm(robotCurrentLocation - robotGoal);
+% Drive the robot using these control commands until it reaches within the
+% goal radius. If you are using an external simulator or a physical robot,
+% then the controller outputs should be applied to the robot and a localization
+% system may be required to update the pose of the robot.
+controlRate = robotics.Rate(10);
+
+
+while( distanceToGoal > goalRadius )
+    
+    % Compute the controller outputs, i.e., the inputs to the robot
+    [v, omega] = controller(robot.getRobotPose);
+    
+    % Simulate the robot using the controller outputs.
+    drive(robot, v, omega);
+    
+    % Extract current location information ([X,Y]) from the current pose of the
+    % robot
+    robotCurrentPose = robot.getRobotPose;
+    
+    % Re-compute the distance to the goal
+    distanceToGoal = norm(robotCurrentPose(1:2) - robotGoal);
+    
+    waitfor(controlRate);
+    
+end
+
+% The simulated robot has reached the goal location using the path following
+% controller along the desired path. Close simulation.
+delete(robot);

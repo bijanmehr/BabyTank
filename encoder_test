@@ -1,0 +1,82 @@
+#include <dmtimer.h>
+
+int encoderL_APin = 3;
+int encoderL_BPin = 7;
+int encoderR_APin = 2;
+int encoderR_BPin = 6;
+
+int Lcounter = 0;
+int Rcounter = 0;
+float WL = 0;
+float revL = 0;
+float WR = 0;
+float revR = 0;
+int BLstat = 0;
+int ALstat = 0;
+int BRstat = 0;
+int ARstat = 0;
+int interval = 20000;
+
+DMTimer myTimer(interval);
+
+void setup() {
+  Serial.begin (115200);
+  pinMode(encoderL_APin, INPUT_PULLUP);
+  pinMode(encoderL_BPin, INPUT_PULLUP);
+  pinMode(encoderR_APin, INPUT_PULLUP);
+  pinMode(encoderR_BPin, INPUT_PULLUP);  
+  attachInterrupt(digitalPinToInterrupt(encoderL_APin), Lcount, RISING);
+  attachInterrupt(digitalPinToInterrupt(encoderR_APin), Rcount, RISING);
+
+
+}
+
+void loop() {
+//  attachInterrupt(digitalPinToInterrupt(encoderL_APin), Lcount, RISING);
+//  attachInterrupt(digitalPinToInterrupt(encoderR_APin), Lcount, RISING);
+
+  if (myTimer.isTimeReached()) {
+    //    detachInterrupt(0);
+    revL = Lcounter /460.0;
+    WL = (revL / interval) * 1000000 ;
+    revR = Rcounter /460.0;
+    WR = (revR / interval) * 1000000 ;
+
+    Serial.print("Lcount:  ");
+    Serial.print(Lcounter);
+    Serial.print("  revL: ");
+    Serial.print(revL);
+    Serial.print("  WL: ");
+    Serial.print(WL);
+    Serial.print("  Rcount:  ");
+    Serial.print(Rcounter);
+    Serial.print("  revR: ");
+    Serial.print(revR);
+    Serial.print("  WR: ");
+    Serial.println(WR);
+
+    Lcounter = 0;
+    Rcounter = 0;
+  }
+}
+
+void Lcount() {
+  BLstat = digitalRead(encoderL_BPin);
+  if (BLstat == 1) {
+    Lcounter++;
+  }
+  if (BLstat == 0) {
+    Lcounter--;
+  }
+}
+
+void Rcount() {
+  BRstat = digitalRead(encoderR_BPin);
+  if (BRstat == 1) {
+    Rcounter++;
+  }
+  if (BRstat == 0) {
+    Rcounter--;
+  }
+}
+

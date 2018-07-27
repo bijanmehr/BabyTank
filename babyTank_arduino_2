@@ -1,0 +1,215 @@
+#include <Wire.h>
+#include <Adafruit_MotorShield.h>
+#include <dmtimer.h>
+#include <FastPID.h>
+#include <math.h>
+#include "StringSplitter.h"
+
+int itemCountWr;
+int itemCountWl;
+
+int encoderL_APin = 3;
+int encoderL_BPin = 7;
+int encoderR_APin = 2;
+int encoderR_BPin = 6;
+int Lcounter = 0;
+int Rcounter = 0;
+
+int Rcnt = 0;
+int Lcnt = 0;
+
+double WL = 0;
+double revL = 0;
+double WR = 0;
+double revR = 0;
+int BLstat = 0;
+int ALstat = 0;
+int BRstat = 0;
+int ARstat = 0;
+int interval = 20000;
+String W = "  ";
+
+float Wr[300];
+float Wl[300];
+//float Wr[] = { -8.790, -1.200, -0.9800, 0.2900, 1.180, -0.2100, 0, 0.9800, -0.0300, -0.8600, 0.3800, 0.1400, -0.0100, -0.0400, 0.1400, 0.500, 0.0900, -0.800, -1.310, -0.9900, -0.9800, 0.1500, -0.500, -0.1900, 0.1400, 0.5900, -0.5200, 0.2800, 0.9800, 0.3400, 0.2600, 0.1700, -0.4500, -0.4800, 0.4300, 0.6500, 0.1800, 0.300, 1.020, 0.1400, 0.0300, 0.1300, -0.0800, 0.900, 0.6900, -0.2500, 0.9300, 1.160, 1.020, 0.3800, 0.3500, 1.030, 0, 0.5800, -0.4700, 1.460, 2.320, 0.6100, 1.340, 1.010, 0.4300, 0.1600, 0.4300, 0.3700, 1.770, 0.0800, 0.3800, 0.8200, -0.2100, -1.540, 0.5400, 0.6800, 0.4300, 0.4100, 1.150, 1.770, -0.3700, 0.2200, -0.1200, 0.600, 1.020};
+//float Wl[] = {9.130, 1.530, 1.310, 0.040, -0.850, 0.540, 0.330, -0.650, 0.370, 1.190, -0.050, 0.190, 0.350, 0.370, 0.20, -0.160, 0.240, 1.140, 1.640, 1.330, 1.310, 0.180, 0.830, 0.520, 0.190, -0.260, 0.850, 0.050, -0.650, -0.010, 0.080, 0.170, 0.780, 0.820, -0.090, -0.310, 0.150, 0.030, -0.680, 0.20, 0.30, 0.20, 0.420, -0.570, -0.360, 0.580, -0.590, -0.830, -0.680, -0.050, -0.020, -0.70, 0.330, -0.250, 0.80, -1.130, -1.990, -0.270, -1.010, -0.670, -0.10, 0.180, -0.10, -0.040, -1.440, 0.250, -0.040, -0.490, 0.550, 1.870, -0.20, -0.350, -0.090, -0.070, -0.810, -1.440, 0.70, 0.110, 0.450, -0.260, -0.690};
+int itemCount = 81;
+
+//float Wr[] = {-0.870,0.370,-0.810,-0.60,-0.570,-0.440,-0.90,0.030,-1.450,-3.340,0.330,0.90,-1,-0.230,-0.140,-0.750,0.240,-0.740,-1.10,1.870,-0.220,-0.20,-0.380,-1.640,-0.30,0.490,-1.570,3.930};
+//float Wl[] = {1.210,-0.030,1.140,0.940,0.90,0.770,1.230,0.310,1.790,3.680,0,-0.560,1.330,0.560,0.470,1.090,0.090,1.070,1.440,-1.540,0.550,0.540,0.720,1.970,0.640,-0.150,1.910,-3.60};
+//int itemCount = 28;
+
+int flag = 0;
+
+double Kp = 0.1, Ki = 0.5, Kd = 0.0, Hz = 100;
+int output_bits = 8;
+bool output_signed = true;
+
+FastPID myPID(Kp, Ki, Kd, Hz, output_bits, output_signed);
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *myMotorR = AFMS.getMotor(1);
+Adafruit_DCMotor *myMotorL = AFMS.getMotor(2);
+
+int Rspeed = 100;
+int Lspeed = 100;
+int Rfeedback;
+int Lfeedback;
+
+
+int idr;
+int idl;
+int idsr;
+int idsl;
+String tempWr;
+String tempWl;
+
+DMTimer myTimer(interval);
+DMTimer timer(200000);
+
+void setup() {
+  Serial.begin(9600);
+  Serial1.begin(9600);
+  AFMS.begin();
+  pinMode(encoderL_APin, INPUT_PULLUP);
+  pinMode(encoderL_BPin, INPUT_PULLUP);
+  pinMode(encoderR_APin, INPUT_PULLUP);
+  pinMode(encoderR_BPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(encoderL_APin), Lcount, RISING);
+  attachInterrupt(digitalPinToInterrupt(encoderR_APin), Rcount, RISING);
+
+
+  myMotorR->setSpeed(Rspeed);
+  myMotorL->setSpeed(Lspeed);
+}
+
+void loop() {
+
+  if (myTimer.isTimeReached()) {
+
+    revL = Lcounter / 460.0;
+    WL = (revL / interval) * 1000000 ;
+    revR = Rcounter / 460.0;
+    WR = (revR / interval) * 1000000 ;
+
+    Lcounter = 0;
+    Rcounter = 0;
+  }
+
+    while (W.equals("  ")) {
+      Serial1.println(2);
+      delay(1);
+      W = Serial1.readStringUntil('\r');
+  
+      idr = W.indexOf("R");
+      idl = W.indexOf("L");
+      idsr = W.indexOf("s");
+      idsl = W.indexOf("p");
+      tempWr = W.substring(idsr, idr - 1);
+      tempWl = W.substring(idr + 1, idl - 1);
+  
+  
+      StringSplitter *splitter = new StringSplitter(tempWr, ';', 200);
+      itemCountWr = splitter->getItemCount();
+      for (int i = 0; i < itemCountWr; i++) {
+        String item = splitter->getItemAtIndex(i);
+        Wr[i] = item.toFloat();
+      }
+      StringSplitter *splitter1 = new StringSplitter(tempWl, ';', 200);
+      itemCountWl = splitter1->getItemCount();
+      for (int j = 0; j < itemCountWl; j++) {
+        String item1 = splitter1->getItemAtIndex(j);
+        Wl[j] = item1.toFloat();
+      }
+    }
+
+  itemCount = itemCountWr;
+
+  for (int i = 0; i < itemCount; i++) {
+    float Vr = 2000 * Wr[i];
+    float Vl = 2000 * Wl[i];
+    Serial.print("Vr: ");
+    Serial.print(Vr);
+    Serial.print("  Vl: ");
+    Serial.print(Vl);
+    int R_PWM = round(map(abs(Vr), 0, 1200, 0, 255));
+    int L_PWM = round(map(abs(Vl), 0, 1200, 0, 255));
+    Serial.print("  R_PWM: ");
+    Serial.print(R_PWM);
+    Serial.print("  L_PWM: ");
+    Serial.println(L_PWM);
+
+    Rspeed = R_PWM;
+    Lspeed = L_PWM;
+
+    Rfeedback = round(WR * 50 * -1);
+    Rfeedback = map(Rfeedback, 0, 1200, 0, 255);
+    Lfeedback = round(WL * 50);
+    Lfeedback = map(Lfeedback, 0, 1200, 0, 255);
+
+    uint8_t new_Rspeed = myPID.step(Rspeed, Rfeedback);
+    uint8_t new_Lspeed = myPID.step(Lspeed, Lfeedback);
+
+    myMotorR->setSpeed(new_Rspeed);
+    myMotorL->setSpeed(new_Lspeed);
+    //    if (Vr > 0 && Vl > 0) {
+    //      myMotorR->run(FORWARD);
+    //      myMotorL->run(FORWARD);
+    //    }
+    //    if (Vr > 0 && Vl < 0) {
+    //      myMotorR->run(FORWARD);
+    //      myMotorL->run(BACKWARD);
+    //    }
+    //    if (Vr < 0 && Vl > 0) {
+    //      myMotorR->run(BACKWARD);
+    //      myMotorL->run(FORWARD);
+    //    }
+    //    if (Vr < 0 && Vl < 0) {
+    //      myMotorR->run(BACKWARD);
+    //      myMotorL->run(BACKWARD);
+    //    }
+    myMotorR->run(BACKWARD);
+    myMotorL->run(FORWARD);
+    delay(200);
+  }
+
+  mstop();
+}
+
+
+void Lcount() {
+  BLstat = digitalRead(encoderL_BPin);
+  if (BLstat == 1) {
+    Lcounter++;
+    Lcnt++;
+  }
+  if (BLstat == 0) {
+    Lcounter--;
+    Lcnt--;
+  }
+}
+
+void Rcount() {
+  BRstat = digitalRead(encoderR_BPin);
+  if (BRstat == 1) {
+    Rcounter++;
+    Rcnt++;
+  }
+  if (BRstat == 0) {
+    Rcounter--;
+    Rcnt--;
+  }
+}
+
+void motor(int Rspeed, int Lspeed) {
+  myMotorR->setSpeed(Rspeed);
+  myMotorL->setSpeed(Lspeed);
+  myMotorR->run(FORWARD);
+  myMotorL->run(BACKWARD);
+}
+
+void mstop() {
+  myMotorL->run(RELEASE);
+  myMotorR->run(RELEASE);
+}
+

@@ -1,0 +1,135 @@
+#include <ESP8266WiFi.h>
+#include "StringSplitter.h"
+#include <math.h>
+
+char ssid[] = "";               // SSID of your home WiFi
+char pass[] = "";               // password of your home WiFi
+WiFiServer server(80);
+
+IPAddress ip(192, 168, 1, 50);            // IP address of the server
+IPAddress gateway(192, 168, 1, 1);        // gateway of your network
+IPAddress subnet(255, 255, 255, 0);       // subnet mask of your network
+
+float x[600];
+float y[600];
+int idx;
+int idy;
+int idsx;
+int idsy;
+String tempx;
+String tempy;
+int itemCount;
+
+int degpulse;
+int dispulse;
+
+int initdeg = 90;
+int initx = 0;
+int inity = 0;
+int predeg;
+int prex;
+int prey;
+int deg;
+int dis;
+
+String W;
+String temp;
+
+void setup() {
+  Serial.begin(115200);
+
+  WiFi.config(ip, gateway, subnet);       // forces to use the fix IP
+  WiFi.begin(ssid, pass);                 // connects to the WiFi router
+  while (WiFi.status() != WL_CONNECTED) {
+    //    Serial.print(".");
+    delay(500);
+  }
+  server.begin();                         // starts the server
+  //  Serial.println("Connected to wifi");
+  //  Serial.print("Status: "); Serial.println(WiFi.status());  // some parameters from the network
+  //  Serial.print("IP: ");     Serial.println(WiFi.localIP());
+  //  Serial.print("Subnet: "); Serial.println(WiFi.subnetMask());
+  //  Serial.print("Gateway: "); Serial.println(WiFi.gatewayIP());
+  //  Serial.print("SSID: "); Serial.println(WiFi.SSID());
+  //  Serial.print("Signal: "); Serial.println(WiFi.RSSI());
+  //  Serial.print("Networks: "); Serial.println(WiFi.scanNetworks());
+
+}
+
+void loop () {
+  Serial.begin(115200);
+  WiFiClient client = server.available();
+  if (client) {
+    if (client.connected()) {
+      //      Serial.println(".");
+      String request = client.readStringUntil('\r');
+      idx = request.indexOf("x");
+      idy = request.indexOf("y");
+      idsx = request.indexOf("s");
+      idsy = request.indexOf("p");
+      tempx = request.substring(idsx + 1, idx);
+      tempy = request.substring(idsy + 1, idy);
+      StringSplitter *splitter = new StringSplitter(tempx, ';', 200);
+      itemCount = splitter->getItemCount();
+      //      x[itemCount];
+      //      Serial.println("Item count: " + String(itemCount));
+      for (int i = 0; i < itemCount; i++) {
+        String item = splitter->getItemAtIndex(i);
+        x[i] = item.toFloat();
+        //        Serial.println("Item @ index " + String(i) + ": " + String(item));
+      }
+      //      Serial.println(F("End of X"));
+      StringSplitter *splitter1 = new StringSplitter(tempy, ';', 200);
+      int itemCount1 = splitter1->getItemCount();
+      //      y[itemCount1];
+      //      Serial.println("Item count: " + String(itemCount1));
+      for (int i = 0; i < itemCount1; i++) {
+        String item1 = splitter1->getItemAtIndex(i);
+        y[i] = item1.toFloat();
+        //        Serial.println("Item @ index " + String(i) + ": " + String(item1));
+      }
+      //      Serial.println(F("End of Y"));
+      //      Serial.println(F("End of program."));
+    }
+    client.stop();
+
+    predeg = initdeg;
+    prex = initx;
+    prey = inity;
+
+    for (int i = 0; i <= itemCount; i++) {
+
+      deg = predeg - atan((y[i] - prey) / (x[i] - prex));
+      degpulse = (deg) / 0.8 + 1;
+      dis = sqrt(sq(y[i] - prey) + sq(x[i] - prex)) ;
+      dispulse = (dis) / (0.8 * 0.02) + 1;
+      //      Serial.print(degpulse);
+      //      Serial.print(" deg  ");
+      //      Serial.print(dispulse);
+      //      Serial.println(" dis");
+      if (degpulse < 400 && dispulse < 800) {
+        W = String(degpulse) + ";" + String(dispulse);
+        //        W = W + temp;
+
+      }
+      predeg = deg;
+      prex = x[i];
+      prey = y[i];
+
+
+      if (Serial.available()) {
+        temp = Serial.readString();
+        while (temp.toInt() == 1) {
+          Serial.println(W);
+          break;
+        }
+      }
+      Serial.flush();
+    }
+Serial.end();
+  }
+
+}
+
+
+

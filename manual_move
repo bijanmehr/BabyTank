@@ -1,0 +1,81 @@
+#include <Wire.h>
+#include <Adafruit_MotorShield.h>
+
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+Adafruit_DCMotor *myMotorR = AFMS.getMotor(3);
+Adafruit_DCMotor *myMotorL = AFMS.getMotor(4);
+
+int Rspeed = 100;
+int Lspeed = 100;
+int flag = 0;
+
+void setup() {
+  Serial.begin(9600);
+  AFMS.begin();
+
+
+  myMotorR->setSpeed(Rspeed);
+  myMotorL->setSpeed(Lspeed);
+}
+
+void loop() {
+
+  while (flag != 1) {
+    delay(2000);
+    Rspeed = 150;
+    Lspeed = 150;
+    
+    motor(Rspeed,Lspeed);
+    delay(3000);
+    turnR(Rspeed,Lspeed);
+    delay(700);
+    motor(Rspeed,Lspeed);
+    delay(3000);
+    turnL(Rspeed,Lspeed);
+    delay(700);
+    motor(Rspeed,Lspeed);
+    delay(3000);
+    turnL(Rspeed,Lspeed);
+    delay(700);
+    motor(Rspeed,Lspeed);
+    delay(3000);
+    turnL(Rspeed,Lspeed);
+    delay(700);
+    motor(Rspeed,Lspeed);
+    delay(6000);
+    
+    
+    flag = 1;
+    mstop();
+  }
+}
+
+void motor(int Rspeed, int Lspeed) {
+  myMotorR->setSpeed(Rspeed);
+  myMotorL->setSpeed(Lspeed);
+  myMotorR->run(FORWARD);
+  myMotorL->run(BACKWARD);
+}
+
+void mstop() {
+  myMotorL->run(RELEASE);
+  myMotorR->run(RELEASE);
+}
+
+
+void turnR(int Rspeed, int Lspeed) {
+  myMotorR->setSpeed(Rspeed);
+  myMotorL->setSpeed(Lspeed);
+  myMotorR->run(FORWARD);
+  myMotorL->run(FORWARD);
+}
+
+
+void turnL(int Rspeed, int Lspeed) {
+  myMotorR->setSpeed(Rspeed);
+  myMotorL->setSpeed(Lspeed);
+  myMotorR->run(BACKWARD);
+  myMotorL->run(BACKWARD);
+}
+
